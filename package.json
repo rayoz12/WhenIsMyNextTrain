@@ -1,0 +1,22 @@
+{
+  "name": "train",
+  "version": "1.0.0",
+  "description": "get the next train",
+  "main": "train.js",
+  "dependencies": {
+    "ical": "^0.5.0",
+    "moment": "^2.21.0",
+    "moment-timezone": "^0.5.14",
+    "mongoose": "^5.0.13",
+    "request": "^2.85.0",
+    "request-promise": "^4.2.2",
+    "trip_planner": "file:../SDKs/SydneyTrains/trip_planner"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
