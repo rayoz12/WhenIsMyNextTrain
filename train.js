@@ -10,6 +10,7 @@ require('moment-timezone');
 //sydney trains api
 //const TripPlanner = require('trip_planner');
 const {TripPlannerAPI, APIConstants} = require('./tripPlanner');
+const tripParser = require("./tripParser");
 
 //uts timetable reccomendations
 const timetableURL = "https://mytimetable.uts.edu.au/aplus2018/rest/calendar/ical/d75d46cd-2d7c-4f74-8bf9-babc060fd716";
@@ -22,16 +23,6 @@ const stopIds = {
 
 const icalURLPromise = util.promisify(ical.fromURL);
 
-/*
-let classes = [{
-		startTime: null, //type moment
-		endTime: null,	//type moment
-		summary: null,
-		description: null,
-		location: null
-	},
-]
-*/
 function parseClasses(events) {
 	const classes = [];
 	for (let k in events){
@@ -85,53 +76,72 @@ async function init() {
 
 	const tripPlannerAPI = new TripPlannerAPI(apiKey);
 
+	let nextClass;
 
-
+	const events = await getAllEvents();
+	try {
+		classes = parseClasses(events);
+		classes.sort((a, b) => a.startTime - b.startTime);
+		nextClass = getNextClass(classes);
+		//console.log(classes);
+	} catch(e) {
+		console.log(e);
+	}
+	
+	console.log("Next Class:", nextClass);
+	
 	const data = await tripPlannerAPI.trip({
-		depArrMacro: APIConstants.depArrOpts.depart,
+		depArrMacro: APIConstants.depArrOpts.arrive,
 		itdDate: moment().format("YYYYMMDD"),
-		itdTime: moment().format("HHMM"),
+		//itdTime: moment().format("HHMM"),
+		itdTime: nextClass.startTime.format("HHMM"),
 		type_origin: APIConstants.stopTypes.any,
 		name_origin: stopIds.mountDruitt,
 		type_destination: APIConstants.stopTypes.any,
 		name_destination: stopIds.central,
-		calcNumberOfTrips: 8,
+		calcNumberOfTrips: 6,
 		excludedMeans: "checkbox",
 		exclMOT_4: 1,
 		exclMOT_5: 1,
 		exclMOT_7: 1,
 		exclMOT_9: 1,
 	});
-	console.log(util.inspect(data, {depth: null}));
-	// try {
-	// 	const data = await tripPlannerRequest(outputFormat, "EPSG:4326", "dep", moment().format("YYYYMMDD"), moment().format("HHMM"), 
-	// 		"any", stopIds.mountDruitt, "any", stopIds.central, {calcNumberOfTrips: 8});
-	// }
-	// catch(e) {
-	// 	console.log(e);
-	// }
-	// console.log(data);
+	//console.log(util.inspect(data, {depth: null}));
 
-	// const data = await request({
-	// 	uri: "https://api.transport.nsw.gov.au/v1/tp/trip?outputFormat=rapidJSON&coordOutputFormat=EPSG%3A4326&depArrMacro=dep&itdDate=20180410&itdTime=18%3A18&type_origin=any&name_origin=10101248&type_destination=any&name_destination=10101100&calcNumberOfTrips=6&TfNSWTR=true&version=10.2.1.42",
-	// 	headers: {
-	// 		"Authorization": " apikey kedzrYyEgrdZr1bwsmVclCloArogBPBlTM5m"
-	// 	},
-	// 	json: true
-	// });
-	// console.log(data);
-	
-	const events = await getAllEvents();
-	try {
-		classes = parseClasses(events);
-		classes.sort((a, b) => a.startTime - b.startTime);
-		console.log(getNextClass(classes));
-		//console.log(classes);
-	} catch(e) {
-		console.log(e);
+	//fs.writeFile('tripData.json', JSON.stringify(data));
+	console.log("-------------------Parsed data---------------------");
+	const trips = tripParser(data);
+	//console.log(util.inspect(trips, {depth: null}));
+
+	for (let i = 0; i < trips.length; i++) {
+		const trip = trips[i];
+		console.log(tripToString(trip))
 	}
 }
 
+function tripToString(trip) {
+	let str = "";
+	str += `${trip.originName.split(", ")[1]} == TO ==> ${trip.destName.split(", ")[1]}` + "\n";
+	str += "Scheduled Running Times: \n"
+	str += `Depart: ${trip.depart.planned.format("dddd, h:mm a")} (in ${trip.depart.planned.fromNow()})` + "\n";
+	str += `Arrive: ${trip.arrival.planned.format("dddd, h:mm a")} (in ${trip.arrival.planned.fromNow()})` + "\n";
+	const delayedMinutes = trip.depart.planned.diff(trip.depart.estimated, 'minutes')
+	if (delayedMinutes > 0) {
+		str += `Train is running ${delayedMinutes} minutes(s) late. New Depart:` + "\n";
+		str += `Depart: ${trip.depart.estimated.format("dddd, h:mm a")} (in ${trip.depart.estimated.fromNow()}` + "\n";
+	}
+	str += `Cost:${trip.fare['SCHOLAR']}` +  "\n";
+	str += "Stops for this Trip: \n";
+	for (let i = 0; i < trip.stops.length; i++) {
+		const stop = trip.stops[i];
+		const delayedStopMinutes = stop.time.planned.diff(stop.time.estimated, 'minutes');
+		if (delayedStopMinutes > 0)
+			str += `${stop.name}: ${stop.time.estimated.format("h:mm a")} (${delayedStopMinutes} mins late), ` + "\n"
+		else
+			str += `${stop.name}: ${stop.time.planned.format("h:mm a")}, ` + "\n"
+	}
+	return str;
+}
 
 init()
 
