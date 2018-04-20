@@ -1,6 +1,8 @@
 const util = require('util');
 const fs = require('fs');
 
+const express = require('express');
+
 const ical = require("ical");
 const request = require("request-promise");
 //request.debug = true
@@ -66,35 +68,59 @@ async function parseIcal() {
 	return await icalURLPromise(timetableURL, {});
 }
 
+
+function tripToString(trip) {
+	let str = "";
+	str += `${trip.originName.split(", ")[1]} == TO ==> ${trip.destName.split(", ")[1]}` + "\n";
+	str += "Scheduled Running Times: \n"
+	str += `Depart: ${trip.depart.planned.format("dddd, h:mm a")} (${trip.depart.planned.fromNow()})` + "\n";
+	str += `Arrive: ${trip.arrival.planned.format("dddd, h:mm a")} (${trip.arrival.planned.fromNow()})` + "\n";
+	const delayedMinutes = trip.depart.planned.diff(trip.depart.estimated, 'minutes')
+	if (delayedMinutes > 0) {
+		str += `Train is running ${delayedMinutes} minutes(s) late. New Depart:` + "\n";
+		str += `Depart: ${trip.depart.estimated.format("dddd, h:mm a")} (${trip.depart.estimated.fromNow()}` + "\n";
+	}
+	str += `Cost:${trip.fare['SCHOLAR']}` +  "\n";
+	str += "Stops for this Trip: \n";
+	for (let i = 0; i < trip.stops.length; i++) {
+		const stop = trip.stops[i];
+		const delayedStopMinutes = stop.time.planned.diff(stop.time.estimated, 'minutes');
+		if (delayedStopMinutes > 0)
+			str += `${stop.name}: ${stop.time.estimated.format("h:mm a")} (${delayedStopMinutes} mins late), ` + "\n"
+		else
+			str += `${stop.name}: ${stop.time.planned.format("h:mm a")}, ` + "\n"
+	}
+	return str;
+}
+
+let apiKeys, tripPlannerAPI, classes;
+
 async function init() {
 	//load API key
-	const apiKey = fs.readFileSync('api.key', { encoding: 'utf-8'});
+	apiKeys = JSON.parse(fs.readFileSync('apiKeys.json', { encoding: 'utf-8'}));
 	//console.log(apiKey);
 	
 	//check if local copy of timetable exists
 	//if (!fs.existsSync(timetableURL.split('/').pop()))	
 
-	const tripPlannerAPI = new TripPlannerAPI(apiKey);
-
-	let nextClass;
-
+	tripPlannerAPI = new TripPlannerAPI(apiKeys.trains);
 	const events = await getAllEvents();
 	try {
 		classes = parseClasses(events);
 		classes.sort((a, b) => a.startTime - b.startTime);
-		nextClass = getNextClass(classes);
+		//nextClass = getNextClass(classes);
 		//console.log(classes);
 	} catch(e) {
 		console.log(e);
 	}
-	
+	/*
 	console.log("Next Class:", nextClass);
 	
 	const data = await tripPlannerAPI.trip({
 		depArrMacro: APIConstants.depArrOpts.arrive,
 		itdDate: moment().format("YYYYMMDD"),
 		//itdTime: moment().format("HHMM"),
-		itdTime: nextClass.startTime.format("HHMM"),
+		itdTime: nextClass.startTime.clone().subtract(10, 'minutes').format("HHmm"),
 		type_origin: APIConstants.stopTypes.any,
 		name_origin: stopIds.mountDruitt,
 		type_destination: APIConstants.stopTypes.any,
@@ -113,37 +139,63 @@ async function init() {
 	const trips = tripParser(data);
 	//console.log(util.inspect(trips, {depth: null}));
 
+	trips.sort((a, b) => a.depart.planned - b.depart.planned);
+
 	for (let i = 0; i < trips.length; i++) {
 		const trip = trips[i];
 		console.log(tripToString(trip))
 	}
+	*/
 }
 
-function tripToString(trip) {
-	let str = "";
-	str += `${trip.originName.split(", ")[1]} == TO ==> ${trip.destName.split(", ")[1]}` + "\n";
-	str += "Scheduled Running Times: \n"
-	str += `Depart: ${trip.depart.planned.format("dddd, h:mm a")} (in ${trip.depart.planned.fromNow()})` + "\n";
-	str += `Arrive: ${trip.arrival.planned.format("dddd, h:mm a")} (in ${trip.arrival.planned.fromNow()})` + "\n";
-	const delayedMinutes = trip.depart.planned.diff(trip.depart.estimated, 'minutes')
-	if (delayedMinutes > 0) {
-		str += `Train is running ${delayedMinutes} minutes(s) late. New Depart:` + "\n";
-		str += `Depart: ${trip.depart.estimated.format("dddd, h:mm a")} (in ${trip.depart.estimated.fromNow()}` + "\n";
-	}
-	str += `Cost:${trip.fare['SCHOLAR']}` +  "\n";
-	str += "Stops for this Trip: \n";
-	for (let i = 0; i < trip.stops.length; i++) {
-		const stop = trip.stops[i];
-		const delayedStopMinutes = stop.time.planned.diff(stop.time.estimated, 'minutes');
-		if (delayedStopMinutes > 0)
-			str += `${stop.name}: ${stop.time.estimated.format("h:mm a")} (${delayedStopMinutes} mins late), ` + "\n"
-		else
-			str += `${stop.name}: ${stop.time.planned.format("h:mm a")}, ` + "\n"
-	}
-	return str;
-}
 
-init()
+init();
+
+
+const app = express();
+
+app.get('/getNextTrainForClass', async (req, res) => {
+	if (!(req.header("apiKey") == apiKeys.serviceKey)) {
+		res.end();
+		return;
+	}
+
+	const nextClass = getNextClass(classes);
+	const returnObj = {
+		nextClass,
+	};
+	let data;
+	try {
+		data = await tripPlannerAPI.trip({
+			depArrMacro: APIConstants.depArrOpts.arrive,
+			itdDate: moment().format("YYYYMMDD"),
+			//itdTime: moment().format("HHMM"),
+			itdTime: nextClass.startTime.clone().subtract(10, 'minutes').format("HHmm"),
+			type_origin: APIConstants.stopTypes.any,
+			name_origin: stopIds.mountDruitt,
+			type_destination: APIConstants.stopTypes.any,
+			name_destination: stopIds.central,
+			calcNumberOfTrips: 6,
+			excludedMeans: "checkbox",
+			exclMOT_4: 1,
+			exclMOT_5: 1,
+			exclMOT_7: 1,
+			exclMOT_9: 1,
+		});
+	}
+	catch (e) {
+		res.status(500).send("Failed to access train API");
+		return;
+	}
+	
+	const trips = tripParser(data);
+
+	returnObj.trips = trips;
+
+	res.json(returnObj);
+})
+
+app.listen(6515);
 
 /*
 ical.fromURL(timetableURL, {}, function(err, data){

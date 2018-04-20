@@ -37,8 +37,8 @@ function parseJourneys(data) {
                 estimated: moment(journey.legs[0].origin.departureTimeEstimated)
             },
             arrival: {
-                planned: moment(journey.legs[lastLegIndex].destination.departureTimePlanned),
-                estimated: moment(journey.legs[lastLegIndex].destination.departureTimeEstimated)
+                planned: moment(journey.legs[lastLegIndex].destination.arrivalTimePlanned),
+                estimated: moment(journey.legs[lastLegIndex].destination.arrivalTimeEstimated)
             }
         };
         let totalDuration = 0;
@@ -49,13 +49,14 @@ function parseJourneys(data) {
         let stops = [];
         journey.legs.forEach(item => {
             item.stopSequence.forEach(stop => {
+                if (stop.departureTimePlanned === undefined)
+                    return;
                 stops.push({
                     name: stop.name.split(", ")[1], 
                     time: {planned: moment(stop.departureTimePlanned), estimated: moment(stop.departureTimeEstimated)}
                 });
             })
-        })
-        stops = stops.filter(item => item.time.planned !== undefined);
+        });
         train.stops = stops;
         train.fare = {};
         journey.fare.tickets.forEach(item => {
