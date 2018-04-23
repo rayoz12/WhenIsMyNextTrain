@@ -2,6 +2,7 @@ const util = require('util');
 const fs = require('fs');
 
 const express = require('express');
+const exphbs  = require('express-handlebars');
 
 const ical = require("ical");
 const request = require("request-promise");
@@ -151,8 +152,18 @@ async function init() {
 
 init();
 
-
 const app = express();
+
+app.engine('handlebars', exphbs({defaultLayout: 'main'}));
+app.set('view engine', 'handlebars');
+
+app.get('/', function (req, res) {
+    res.render('login');
+});
+
+app.post('/login', function (req, res) {
+    res.render('login');
+});
 
 app.get('/getNextTrainForClass', async (req, res) => {
 	if (!(req.header("apiKey") == apiKeys.serviceKey)) {
@@ -195,6 +206,7 @@ app.get('/getNextTrainForClass', async (req, res) => {
 	res.json(returnObj);
 })
 
+console.log("Listening on 6515");
 app.listen(6515);
 
 /*
