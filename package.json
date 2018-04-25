@@ -11,8 +11,7 @@
     "moment-timezone": "^0.5.14",
     "mongoose": "^5.0.13",
     "request": "^2.85.0",
-    "request-promise": "^4.2.2",
-    "trip_planner": "file:../SDKs/SydneyTrains/trip_planner"
+    "request-promise": "^4.2.2"
   },
   "devDependencies": {},
   "scripts": {

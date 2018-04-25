@@ -4,6 +4,7 @@ const fs = require('fs');
 const express = require('express');
 const exphbs  = require('express-handlebars');
 
+
 const ical = require("ical");
 const request = require("request-promise");
 //request.debug = true
@@ -94,11 +95,14 @@ function tripToString(trip) {
 	return str;
 }
 
-let apiKeys, tripPlannerAPI, classes;
+let apiKeys, accounts, tripPlannerAPI, classes;
 
 async function init() {
 	//load API key
 	apiKeys = JSON.parse(fs.readFileSync('apiKeys.json', { encoding: 'utf-8'}));
+	//load accounts
+	accounts = JSON.parse(fs.readFileSync('accounts.json', { encoding: 'utf-8'}));
+
 	//console.log(apiKey);
 	
 	//check if local copy of timetable exists
@@ -153,6 +157,8 @@ async function init() {
 init();
 
 const app = express();
+app.use(express.urlencoded({ extended: true }));
+
 
 app.engine('handlebars', exphbs({defaultLayout: 'main'}));
 app.set('view engine', 'handlebars');
@@ -162,7 +168,20 @@ app.get('/', function (req, res) {
 });
 
 app.post('/login', function (req, res) {
-    res.render('login');
+	console.log(req.body || "no body");
+	const login = req.body;
+	let found = false;
+	for (account of accounts) {
+		if (account.username === login.username && account.password === login.password)
+			found = true;
+	}
+	if (!found) {
+		res.status(400).send("Invalid account details");
+		reuturn;
+	}
+
+	res.render("trainView");
+
 });
 
 app.get('/getNextTrainForClass', async (req, res) => {
