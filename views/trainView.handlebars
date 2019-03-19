@@ -1,1 +1,35 @@
-YOU'RE LOGGED IN AWESOME
+<div>
+    {{#with nextClass}}
+    <p>Class: {{summary}}</p>
+    <p>Time: {{formatTime startTime}}-{{formatTime endTime}}</p>
+    <p>Location: {{location}}</p>
+    {{/with}}
+</div>
+<div class="list-group">
+    {{#each trains}}
+    {{#with this}}
+        <a href="#collapse1" data-toggle="collapse" class="list-group-item list-group-item-action flex-column align-items-start">
+            <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1 font-weight-bold">{{formatStation originName}} to {{formatStation destName}}</h5>
+                <small>{{formatTime arrival.estimated}}</small>
+            </div>
+            <div class="panel panel-default">
+                <div id="collapse1" class="panel-collapse collapse">
+                    <ul class="list-group d-flex w-100 justify-content-between">
+                        {{#each stops}}
+                        {{#with this}}
+                        <h5 class="mb-1">{{name}}</h5>
+                        <small>{{formatTime time.estimated}}</small>
+                        {{/with}}
+                        {{/each}}
+                    </ul>
+                </div>
+            </div>
+            <p class="mb-1">Donec id elit non mi porta gravida at eget metus. Maecenas sed diam eget risus varius blandit.</p>
+            <small>Donec id elit non mi porta.</small>
+        </a>
+
+
+    {{/with}}
+    {{/each}}
+</div>

@@ -1,0 +1,4 @@
+{
+    "trains": "<sydney trains API Key>",
+    "serviceKey": "<The API Key to use the REST_API provided by this project>"
+}

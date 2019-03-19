@@ -159,15 +159,26 @@ init();
 const app = express();
 app.use(express.urlencoded({ extended: true }));
 
+let hbs = exphbs.create({
+	defaultLayout: 'main',
+	helpers: {
+		formatStation: (station) => station.split(", ").slice(1,3).join(", "),
+		formatTime: (time) => moment(time).format("h:mm a"),
+	}
+})
 
-app.engine('handlebars', exphbs({defaultLayout: 'main'}));
+app.engine('handlebars', hbs.engine);
 app.set('view engine', 'handlebars');
 
-app.get('/', function (req, res) {
+app.get('/', async (req, res) => {
     res.render('login');
 });
 
-app.post('/login', function (req, res) {
+app.get('/settings', async (req, res) => {
+    res.render('settings');
+});
+
+app.post('/login', async (req, res) => {
 	console.log(req.body || "no body");
 	const login = req.body;
 	let found = false;
@@ -180,7 +191,39 @@ app.post('/login', function (req, res) {
 		reuturn;
 	}
 
-	res.render("trainView");
+	const nextClass = getNextClass(classes);
+	
+	let data;
+	try {
+		data = await tripPlannerAPI.trip({
+			depArrMacro: APIConstants.depArrOpts.arrive,
+			itdDate: nextClass.startTime.format("YYYYMMDD"),
+			//itdTime: moment().format("HHMM"),
+			itdTime: nextClass.startTime.format("HHmm"),
+			type_origin: APIConstants.stopTypes.any,
+			name_origin: stopIds.mountDruitt,
+			type_destination: APIConstants.stopTypes.any,
+			name_destination: stopIds.central,
+			calcNumberOfTrips: 6,
+			excludedMeans: "checkbox",
+			exclMOT_4: 1,
+			exclMOT_5: 1,
+			exclMOT_7: 1,
+			exclMOT_9: 1,
+		});
+	}
+	catch (e) {
+		res.status(500).send("Failed to access train API");
+		return;
+	}
+	
+	const trips = tripParser(data);
+
+	//returnObj.trips = trips;
+
+	//res.json(returnObj);
+
+	res.render("trainView", {nextClass, trains: trips});
 
 });
 
@@ -198,9 +241,9 @@ app.get('/getNextTrainForClass', async (req, res) => {
 	try {
 		data = await tripPlannerAPI.trip({
 			depArrMacro: APIConstants.depArrOpts.arrive,
-			itdDate: moment().format("YYYYMMDD"),
+			itdDate: nextClass.startTime.format("YYYYMMDD"),
 			//itdTime: moment().format("HHMM"),
-			itdTime: nextClass.startTime.clone().subtract(10, 'minutes').format("HHmm"),
+			itdTime: nextClass.startTime.format("HHmm"),
 			type_origin: APIConstants.stopTypes.any,
 			name_origin: stopIds.mountDruitt,
 			type_destination: APIConstants.stopTypes.any,

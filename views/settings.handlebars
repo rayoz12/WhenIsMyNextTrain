@@ -1,0 +1,30 @@
+<div class="container">
+    <div class="row">
+        <label for="iCalLink" class="col-md-1">iCal Link</label>
+        <div class="col-md-11">
+            <input class="form-control" type="url" id="iCalLink" name="iCalLink"/>
+        </div>
+    </div>
+    <div class="row">
+        <label for="StationFrom" class="col-md-1">Station From</label>
+        <div class="col-md-11">
+            <input class="form-control" type="text" id="StationFrom" name="StationFrom"/>
+        </div>
+    </div>
+    <div class="row">
+        <label for="StationTo" class="col-md-1">Station To</label>
+        <div class="col-md-11">
+            <input class="form-control" type="text" id="StationTo" name="StationTo"/>
+        </div>
+    </div>
+    <div class="row">
+        <input type="button" value="Save Settings" onclick="saveSettings()" />
+    </div>
+</div>
+
+<script>
+    function saveSettings() {
+        const iCal = document.getElementById("iCalLink");
+        localStorage.setItem("iCalLink", iCal.value);
+    }
+</script>
